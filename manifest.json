@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.loedn.workspace-router",
+  "name": "Workspace Router",
+  "version": "1.0.0",
+  "author": "Loedn",
+  "license": "MIT",
+  "description": "Assign apps to Hyprland workspaces and choose whether focus follows each app.",
+  "kinds": ["menu"],
+  "entryPoints": { "menu": "WorkspaceRouter.qml" }
+}

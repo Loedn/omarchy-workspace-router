@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+project_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+helper="$project_dir/bin/omarchy-workspace-apps"
+portable_only=false
+[[ ${1:-} == "--portable" ]] && portable_only=true
+
+jq -e '
+  .schemaVersion == 1
+  and .id == "io.github.loedn.workspace-router"
+  and .author == "Loedn"
+  and (.kinds | index("menu")) != null
+  and (.kinds | index("bar-widget")) == null
+  and .entryPoints.menu == "WorkspaceRouter.qml"
+' "$project_dir/manifest.json" >/dev/null
+
+bash -n "$helper"
+if command -v shellcheck >/dev/null; then
+  shellcheck "$helper" "$project_dir/tests/run"
+fi
+
+test_dir=$(mktemp -d)
+trap 'rm -rf "$test_dir"' EXIT
+
+printf '%s\n' '{"version":1,"rules":[{"class":"firefox","workspace":3,"focus":true},{"class":"Spotify","workspace":5,"focus":false},{"class":"legacy.app","workspace":4}]}' >"$test_dir/workspace-apps.json"
+OMARCHY_WORKSPACE_APPS_CONFIG_DIR="$test_dir" "$helper" render
+luac -p "$test_dir/workspace-apps.lua"
+
+grep -F 'initial_class = [[^firefox$]] }, { workspace = "3" }' "$test_dir/workspace-apps.lua" >/dev/null
+grep -F 'initial_class = [[^Spotify$]] }, { workspace = "5 silent" }' "$test_dir/workspace-apps.lua" >/dev/null
+grep -F 'initial_class = [[^legacy\.app$]] }, { workspace = "4 silent" }' "$test_dir/workspace-apps.lua" >/dev/null
+
+cat >"$test_dir/omarchy-menu.jsonc" <<'EOF'
+{
+  // Existing user entry must survive.
+  "personal.notes": {"icon":"x","label":"Notes","action":"true"},
+  "setup.workspace-apps": {
+    "icon": "old",
+    "label": "Workspace Apps"
+  },
+  "setup.workspace-apps.assign": {
+    "label": "Assign",
+    "action": "old-helper assign"
+  },
+}
+EOF
+
+menu_env=(
+  OMARCHY_WORKSPACE_ROUTER_MENU_FILE="$test_dir/omarchy-menu.jsonc"
+  OMARCHY_WORKSPACE_ROUTER_NO_NOTIFY=1
+)
+env "${menu_env[@]}" "$helper" menu-install
+env "${menu_env[@]}" "$helper" menu-install
+grep -F '"personal.notes"' "$test_dir/omarchy-menu.jsonc" >/dev/null
+grep -F '"setup.workspace-router"' "$test_dir/omarchy-menu.jsonc" >/dev/null
+! grep -F 'setup.workspace-apps' "$test_dir/omarchy-menu.jsonc" >/dev/null
+[[ $(grep -Fc 'Workspace Router plugin menu entry - begin' "$test_dir/omarchy-menu.jsonc") == 1 ]]
+
+env "${menu_env[@]}" "$helper" menu-remove
+grep -F '"personal.notes"' "$test_dir/omarchy-menu.jsonc" >/dev/null
+! grep -F 'setup.workspace-router' "$test_dir/omarchy-menu.jsonc" >/dev/null
+! grep -F 'Workspace Router plugin menu entry' "$test_dir/omarchy-menu.jsonc" >/dev/null
+
+if ! $portable_only; then
+  omarchy plugin validate "$project_dir"
+  qmllint -I "${OMARCHY_PATH:-/usr/share/omarchy}/shell" "$project_dir/WorkspaceRouter.qml"
+fi
+
+printf '%s\n' "Workspace Router validation passed."

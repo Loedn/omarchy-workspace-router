@@ -55,13 +55,22 @@ env "${menu_env[@]}" "$helper" menu-install
 env "${menu_env[@]}" "$helper" menu-install
 grep -F '"personal.notes"' "$test_dir/omarchy-menu.jsonc" >/dev/null
 grep -F '"setup.workspace-router"' "$test_dir/omarchy-menu.jsonc" >/dev/null
-! grep -F 'setup.workspace-apps' "$test_dir/omarchy-menu.jsonc" >/dev/null
+if grep -F 'setup.workspace-apps' "$test_dir/omarchy-menu.jsonc" >/dev/null; then
+  printf '%s\n' "Legacy workspace-apps menu entries were not removed." >&2
+  exit 1
+fi
 [[ $(grep -Fc 'Workspace Router plugin menu entry - begin' "$test_dir/omarchy-menu.jsonc") == 1 ]]
 
 env "${menu_env[@]}" "$helper" menu-remove
 grep -F '"personal.notes"' "$test_dir/omarchy-menu.jsonc" >/dev/null
-! grep -F 'setup.workspace-router' "$test_dir/omarchy-menu.jsonc" >/dev/null
-! grep -F 'Workspace Router plugin menu entry' "$test_dir/omarchy-menu.jsonc" >/dev/null
+if grep -F 'setup.workspace-router' "$test_dir/omarchy-menu.jsonc" >/dev/null; then
+  printf '%s\n' "Workspace Router menu entry was not removed." >&2
+  exit 1
+fi
+if grep -F 'Workspace Router plugin menu entry' "$test_dir/omarchy-menu.jsonc" >/dev/null; then
+  printf '%s\n' "Workspace Router menu markers were not removed." >&2
+  exit 1
+fi
 
 if ! $portable_only; then
   omarchy plugin validate "$project_dir"

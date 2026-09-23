@@ -121,7 +121,7 @@ lua_long_string() {
 
 regex_escape() {
   local value="$1" character
-  for character in '\\' '[' ']' '(' ')' '{' '}' '.' '^' '$' '*' '+' '?' '|'; do
+  for character in "\\" '[' ']' '(' ')' '{' '}' '.' '^' '$' '*' '+' '?' '|'; do
     value=${value//"$character"/\\$character}
   done
   printf '%s\n' "$value"
